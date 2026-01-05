@@ -1,0 +1,5 @@
+{
+  "name": "InvokeAI Metadata Explorer",
+  "description": "A high-performance web tool to browse, filter, and categorize InvokeAI generated PNGs by extracting their internal metadata and positive prompts.",
+  "requestFramePermissions": []
+}
