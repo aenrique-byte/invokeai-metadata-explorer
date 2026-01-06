@@ -27,12 +27,6 @@ const App: React.FC = () => {
   const [tagSearch, setTagSearch] = useState('');
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const includeSubfoldersRef = useRef(includeSubfolders);
-
-  // Keep ref in sync with state
-  useEffect(() => {
-    includeSubfoldersRef.current = includeSubfolders;
-  }, [includeSubfolders]);
 
   const selectedImage = useMemo(() => 
     selectedImageId ? images.find(img => img.id === selectedImageId) || null : null
@@ -48,19 +42,17 @@ const App: React.FC = () => {
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     setIsProcessing(true);
 
-    const shouldIncludeSubfolders = includeSubfoldersRef.current;
-
     // Filter for PNG files and optionally exclude files from subfolders
     const fileArray = Array.from(files).filter(f => {
       if (!f.name.toLowerCase().endsWith('.png')) return false;
 
       // Check if file has webkitRelativePath (folder upload)
       const relativePath = (f as any).webkitRelativePath;
-      if (relativePath && !shouldIncludeSubfolders) {
+      if (relativePath && !includeSubfolders) {
         // Only include files directly in the selected folder (no subdirectories)
         // Split by both forward slash and backslash for Windows compatibility
         const pathParts = relativePath.split(/[/\\]/);
-        console.log(`Checking: ${relativePath}, parts: ${pathParts.length}`);
+        console.log(`Checking: ${relativePath}, parts: ${pathParts.length}, includeSubfolders: ${includeSubfolders}`);
         return pathParts.length === 2; // [folderName, fileName]
       }
 
@@ -68,7 +60,7 @@ const App: React.FC = () => {
       return true;
     });
 
-    console.log(`Processing ${fileArray.length} PNG files from ${files.length} total files (subfolders: ${shouldIncludeSubfolders ? 'included' : 'excluded'})`);
+    console.log(`Processing ${fileArray.length} PNG files from ${files.length} total files (subfolders: ${includeSubfolders ? 'included' : 'excluded'})`);
     const totalCount = fileArray.length;
     setProgress({ current: 0, total: totalCount });
 
@@ -107,7 +99,7 @@ const App: React.FC = () => {
 
     setImages(prev => [...prev, ...processedImages]);
     setIsProcessing(false);
-  }, []);
+  }, [includeSubfolders]);
 
   const removeSingleImage = useCallback((id: string) => {
     setImages(prev => {
