@@ -21,6 +21,7 @@ const App: React.FC = () => {
     models: [],
     onlyLiked: false
   });
+  const [tagSearch, setTagSearch] = useState('');
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const includeSubfoldersRef = useRef(includeSubfolders);
@@ -286,8 +287,16 @@ const App: React.FC = () => {
     images.forEach(img => {
       img.tags.forEach(tag => tagMap.set(tag, (tagMap.get(tag) || 0) + 1));
     });
-    return Array.from(tagMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 40);
-  }, [images]);
+    const allTags = Array.from(tagMap.entries()).sort((a, b) => b[1] - a[1]);
+
+    // Filter by tag search if there's a search term
+    if (tagSearch.trim()) {
+      const searchLower = tagSearch.toLowerCase();
+      return allTags.filter(([tag]) => tag.toLowerCase().includes(searchLower));
+    }
+
+    return allTags;
+  }, [images, tagSearch]);
 
   const allAvailableModels = useMemo(() => {
     const models = new Set<string>();
@@ -349,11 +358,32 @@ const App: React.FC = () => {
           </section>
 
           <section>
-            <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2"><span className="w-1 h-1 bg-blue-500 rounded-full"></span>Prompt Tags</h2>
-            <div className="flex flex-wrap gap-1.5">
+            <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3 flex items-center gap-2"><span className="w-1 h-1 bg-blue-500 rounded-full"></span>Prompt Tags</h2>
+            <div className="relative mb-3">
+              <svg className="w-3 h-3 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+              <input
+                type="text"
+                placeholder="Search tags..."
+                value={tagSearch}
+                onChange={(e) => setTagSearch(e.target.value)}
+                className="w-full bg-slate-900/50 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500 transition-all placeholder-slate-600"
+              />
+              {tagSearch && (
+                <button
+                  onClick={() => setTagSearch('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5 max-h-96 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
               {allAvailableTags.map(([tag, count]) => (
                 <button key={tag} onClick={() => setFilters(f => ({ ...f, selectedTags: f.selectedTags.includes(tag) ? f.selectedTags.filter(t => t !== tag) : [...f.selectedTags, tag] }))} className={`px-2 py-1 text-[11px] font-medium rounded transition-all border ${filters.selectedTags.includes(tag) ? 'bg-blue-600 text-white border-blue-500 shadow-md' : 'bg-slate-800/50 text-slate-400 border-slate-700 hover:text-white hover:bg-slate-700'}`}>{tag} <span className="opacity-40 ml-0.5">{count}</span></button>
               ))}
+              {allAvailableTags.length === 0 && tagSearch && (
+                <p className="text-xs text-slate-500 italic py-2">No tags match "{tagSearch}"</p>
+              )}
             </div>
           </section>
 
