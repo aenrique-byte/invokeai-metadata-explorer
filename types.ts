@@ -28,6 +28,7 @@ export interface ImageRecord {
   size: number;
   tags: string[];
   isLiked?: boolean;
+  lastModified: number;
 }
 
 export interface FilterState {
@@ -35,4 +36,6 @@ export interface FilterState {
   selectedTags: string[];
   models: string[];
   onlyLiked: boolean;
+  dateFrom: string | null;
+  dateTo: string | null;
 }

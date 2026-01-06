@@ -20,7 +20,9 @@ const App: React.FC = () => {
     search: '',
     selectedTags: [],
     models: [],
-    onlyLiked: false
+    onlyLiked: false,
+    dateFrom: null,
+    dateTo: null
   });
   const [tagSearch, setTagSearch] = useState('');
 
@@ -88,7 +90,8 @@ const App: React.FC = () => {
             name: file.name,
             size: file.size,
             tags,
-            isLiked: false
+            isLiked: false,
+            lastModified: file.lastModified
           } as ImageRecord;
         } catch (err) {
           return null;
@@ -174,7 +177,20 @@ const App: React.FC = () => {
 
       const matchesLiked = !filters.onlyLiked || img.isLiked;
 
-      return matchesSearch && matchesTags && matchesModel && matchesLiked;
+      // Date filtering
+      let matchesDate = true;
+      if (filters.dateFrom) {
+        const fromDate = new Date(filters.dateFrom);
+        fromDate.setHours(0, 0, 0, 0);
+        matchesDate = matchesDate && img.lastModified >= fromDate.getTime();
+      }
+      if (filters.dateTo) {
+        const toDate = new Date(filters.dateTo);
+        toDate.setHours(23, 59, 59, 999);
+        matchesDate = matchesDate && img.lastModified <= toDate.getTime();
+      }
+
+      return matchesSearch && matchesTags && matchesModel && matchesLiked && matchesDate;
     });
   }, [images, filters]);
 
@@ -323,14 +339,81 @@ const App: React.FC = () => {
     setImages(prev => prev.filter(img => !filteredIds.has(img.id)));
 
     // Clear filters after removing
-    setFilters({ search: '', selectedTags: [], models: [], onlyLiked: false });
+    setFilters({ search: '', selectedTags: [], models: [], onlyLiked: false, dateFrom: null, dateTo: null });
   };
 
   const clearAll = () => {
     if (!confirm('Clear entire session?')) return;
     images.forEach(img => URL.revokeObjectURL(img.previewUrl));
     setImages([]);
-    setFilters({ search: '', selectedTags: [], models: [], onlyLiked: false });
+    setFilters({ search: '', selectedTags: [], models: [], onlyLiked: false, dateFrom: null, dateTo: null });
+  };
+
+  // Helper function to set date presets
+  const setDatePreset = (preset: string) => {
+    const now = new Date();
+    let dateFrom: string | null = null;
+    let dateTo: string | null = null;
+
+    switch (preset) {
+      case 'today':
+        dateFrom = now.toISOString().split('T')[0];
+        dateTo = dateFrom;
+        break;
+      case 'last7days':
+        dateTo = now.toISOString().split('T')[0];
+        const last7 = new Date(now);
+        last7.setDate(last7.getDate() - 7);
+        dateFrom = last7.toISOString().split('T')[0];
+        break;
+      case 'last30days':
+        dateTo = now.toISOString().split('T')[0];
+        const last30 = new Date(now);
+        last30.setDate(last30.getDate() - 30);
+        dateFrom = last30.toISOString().split('T')[0];
+        break;
+      case 'thisMonth':
+        dateFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        dateTo = now.toISOString().split('T')[0];
+        break;
+      case 'thisYear':
+        dateFrom = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+        dateTo = now.toISOString().split('T')[0];
+        break;
+      case 'all':
+      default:
+        dateFrom = null;
+        dateTo = null;
+        break;
+    }
+
+    setFilters(f => ({ ...f, dateFrom, dateTo }));
+  };
+
+  // Get currently active preset
+  const getActivePreset = (): string | null => {
+    if (!filters.dateFrom && !filters.dateTo) return 'all';
+    
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    
+    if (filters.dateFrom === today && filters.dateTo === today) return 'today';
+    
+    const last7 = new Date(now);
+    last7.setDate(last7.getDate() - 7);
+    if (filters.dateFrom === last7.toISOString().split('T')[0] && filters.dateTo === today) return 'last7days';
+    
+    const last30 = new Date(now);
+    last30.setDate(last30.getDate() - 30);
+    if (filters.dateFrom === last30.toISOString().split('T')[0] && filters.dateTo === today) return 'last30days';
+    
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    if (filters.dateFrom === thisMonthStart && filters.dateTo === today) return 'thisMonth';
+    
+    const thisYearStart = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+    if (filters.dateFrom === thisYearStart && filters.dateTo === today) return 'thisYear';
+    
+    return null; // Custom range
   };
 
   return (
@@ -398,6 +481,65 @@ const App: React.FC = () => {
               {allAvailableModels.map(model => (
                 <label key={model} className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-slate-800/50 cursor-pointer transition-colors"><input type="checkbox" checked={filters.models.includes(model)} onChange={() => setFilters(f => ({ ...f, models: f.models.includes(model) ? f.models.filter(m => m !== model) : [...f.models, model] }))} className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-blue-600" /><span className="text-xs text-slate-400 truncate">{model}</span></label>
               ))}
+            </div>
+          </section>
+
+          <section>
+            <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2"><span className="w-1 h-1 bg-amber-500 rounded-full"></span>Date Range</h2>
+            
+            {/* Preset buttons */}
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              {[
+                { key: 'all', label: 'All Time' },
+                { key: 'today', label: 'Today' },
+                { key: 'last7days', label: 'Last 7 Days' },
+                { key: 'last30days', label: 'Last 30 Days' },
+                { key: 'thisMonth', label: 'This Month' },
+                { key: 'thisYear', label: 'This Year' },
+              ].map(preset => (
+                <button
+                  key={preset.key}
+                  onClick={() => setDatePreset(preset.key)}
+                  className={`px-2 py-1 text-[10px] font-bold rounded transition-all border ${
+                    getActivePreset() === preset.key
+                      ? 'bg-amber-600 text-white border-amber-500 shadow-md'
+                      : 'bg-slate-800/50 text-slate-400 border-slate-700 hover:text-white hover:bg-slate-700'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom date range inputs */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <label className="text-[9px] text-slate-500 font-bold uppercase w-10">From</label>
+                <input
+                  type="date"
+                  value={filters.dateFrom || ''}
+                  onChange={(e) => setFilters(f => ({ ...f, dateFrom: e.target.value || null }))}
+                  className="flex-1 bg-slate-900/50 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500 transition-all [color-scheme:dark]"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-[9px] text-slate-500 font-bold uppercase w-10">To</label>
+                <input
+                  type="date"
+                  value={filters.dateTo || ''}
+                  onChange={(e) => setFilters(f => ({ ...f, dateTo: e.target.value || null }))}
+                  className="flex-1 bg-slate-900/50 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500 transition-all [color-scheme:dark]"
+                />
+              </div>
+              {(filters.dateFrom || filters.dateTo) && (
+                <button
+                  onClick={() => setFilters(f => ({ ...f, dateFrom: null, dateTo: null }))}
+                  className="w-full mt-2 py-1.5 text-[10px] font-bold text-slate-500 hover:text-slate-300 bg-slate-800/30 border border-slate-700/50 rounded-lg flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  Clear Dates
+                </button>
+              )}
             </div>
           </section>
 
