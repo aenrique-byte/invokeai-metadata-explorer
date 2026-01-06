@@ -4,6 +4,7 @@ import { ImageRecord, FilterState } from './types';
 import { extractInvokeAIMetadata, extractTagsFromPrompt } from './services/pngMetadataService';
 import FileUploader from './components/FileUploader';
 import ImageCard from './components/ImageCard';
+import JSZip from 'jszip';
 
 const ITEMS_PER_PAGE = 48;
 
@@ -215,11 +216,12 @@ const App: React.FC = () => {
       return;
     }
 
-    if (!confirm(`Export ${liked.length} images as WEBPs (Lossy, 85% quality) to Downloads folder?`)) return;
+    if (!confirm(`Export ${liked.length} images as WEBPs (Lossy, 85% quality) in a ZIP file?`)) return;
 
     setIsExporting(true);
     setProgress({ current: 0, total: liked.length });
 
+    const zip = new JSZip();
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
 
@@ -242,21 +244,24 @@ const App: React.FC = () => {
 
         if (blob) {
           const finalFileName = imgRec.customName || imgRec.name.replace(/\.[^/.]+$/, "");
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `${finalFileName}.webp`;
-          a.click();
-          setTimeout(() => URL.revokeObjectURL(url), 100);
-          await new Promise(r => setTimeout(r, 200));
+          zip.file(`${finalFileName}.webp`, blob);
         }
       } catch (err) {
         console.error("Export failed for", imgRec.name, err);
       }
     }
 
+    // Generate ZIP file
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `invokeai_export_${Date.now()}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+
     setIsExporting(false);
-    alert(`Successfully exported ${liked.length} images to Downloads folder!`);
+    alert(`Successfully exported ${liked.length} images as ZIP to Downloads folder!`);
   };
 
   const exportLikedMarkdown = () => {
